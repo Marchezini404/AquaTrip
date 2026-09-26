@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="<%= locals.htmlLang || 'pt-BR' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#eef6f8" />
+  <title><%= seo.titulo %></title>
+  <%- include('../partials/seo') %>
+  <meta name="csrf-token" content="<%= csrfToken %>">
+  <link rel="stylesheet" href="/css/experiencia.css" />
+  <link rel="stylesheet" href="/css/comunidade.css" />
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+
+<%- include('../partials/header') %>
+
+<%
+  const c = capaDe(service);
+  const sc = aquaScore(service.slug);
+  const gratuita = !service.price_cents;
+  const precoFmt = gratuita ? t('comunidade.gratuita') : 'R$ ' + (service.price_cents / 100).toFixed(2).replace('.', ',');
+  const comunidade = social && social.comunidade;
+  const eDono = social && social.eDoViewer;
+  // Comunidade e parceiros publicam na hora: qualquer um pode denunciar.
+  const podeDenunciar = !eDono && (comunidade || !!service.operador);
+  const rotas = { praia: '/praias', mergulho: '/mergulho', caiaque: '/caiaque', pesca: '/pesca', expedicao: '/expedicoes', aquario: '/aquarios' };
+  const logado = typeof user !== 'undefined' && user;
+%>
+
+<main id="main-content" class="xp">
+  <div class="container">
+    <nav class="crumbs" aria-label="<%= t('home.crumbs_aria') %>">
+      <a href="/"><%= t('dock.inicio') %></a><i data-lucide="chevron-right"></i>
+      <a href="/reservar"><%= t('home.dest_titulo_curto') %></a><i data-lucide="chevron-right"></i>
+      <% if (rotas[service.category]) { %><a href="<%= rotas[service.category] %>"><%= categoriaRotulo(service.category) %></a><i data-lucide="chevron-right"></i><% } %>
+      <span aria-current="page"><%= service.title %></span>
+    </nav>
+
+    <figure class="xp-hero">
+      <img src="<%= c.src %>" alt="<%= c.alt %>" fetchpriority="high">
+      <% if (c.ilustrativa) { %><figcaption><%= t('exp.imagem_ilustrativa') %></figcaption><% } %>
+    </figure>
+
+    <div class="xp-layout">
+      <div class="xp-main">
+        <h1 class="xp-title"><%= service.title %></h1>
+        <p class="xp-meta">
+          <span><i data-lucide="map-pin"></i> <%= service.location || t('home.brasil') %></span>
+          <span><i data-lucide="waves"></i> <%= categoriaRotulo(service.category) %></span>
+          <%# Quem presta o serviço (CDC, art. 31): parceiro ou o próprio AquaTrip. %>
+          <% if (comunidade) { %>
+            <span class="service-operador"><i data-lucide="user-round"></i> <%= t('social.organizado_por') %> <a href="/usuarios/<%= encodeURIComponent(social.criador.id) %>"><strong><%= social.criador.nome %></strong></a></span>
+          <% } else { %>
+            <span class="service-operador"><i data-lucide="badge-check"></i> <%= t('exp.operado_por') %> <strong><%= service.operador || 'AquaTrip' %></strong></span>
+          <% } %>
+        </p>
+        <% if (social && social.exemplo) { %>
+          <p class="aviso-exemplo" role="note"><span class="tag-exemplo"><%= t('comunidade.exemplo') %></span> <%= t('social.aviso_exemplo') %></p>
+        <% } %>
+
+        <div class="sx-bar" data-servico="<%= service.id %>">
+          <button type="button" class="sx-btn<%= social.meu.curtiu ? ' is-on' : '' %>" data-curtir="<%= service.id %>" aria-pressed="<%= social.meu.curtiu %>" <%= logado ? '' : 'data-login' %>>
+            <i data-lucide="heart"></i> <span><%= t('social.curtir') %></span> <span class="num sx-n" data-contagem><%= social.curtidas %></span>
+          </button>
+          <% if (comunidade && !eDono) { %>
+            <button type="button" class="sx-btn<%= social.meu.interesse ? ' is-on' : '' %>" data-interesse="<%= service.id %>" aria-pressed="<%= social.meu.interesse %>" <%= logado ? '' : 'data-login' %>>
+              <i data-lucide="hand"></i> <span><%= t('social.tenho_interesse') %></span> <span class="num sx-n" data-contagem><%= social.interessados %></span>
+            </button>
+          <% } %>
+          <a class="sx-btn" href="#comentarios"><i data-lucide="message-circle"></i> <span><%= t('social.comentarios') %></span> <span class="num sx-n" id="sxNComentarios"><%= comentarios.length %></span></a>
+          <% if (eDono) { %>
+            <a class="sx-btn sx-btn-primary" href="/criar_experiencia?editar=<%= encodeURIComponent(service.id) %>"><i data-lucide="settings-2"></i> <span><%= t('social.gerenciar') %></span></a>
+          <% } else if (podeDenunciar) { %>
+            <button type="button" class="sx-btn sx-btn-quiet" id="sxDenunciar" <%= logado ? '' : 'data-login' %> <%= social.meu.denunciou ? 'disabled' : '' %>>
+              <i data-lucide="flag"></i> <span><%= social.meu.denunciou ? t('social.denunciado') : t('social.denunciar') %></span>
+            </button>
+          <% } %>
+        </div>
+
+        <% if (service.description) { %>
+          <p class="xp-desc service-desc"><%= service.description %></p>
+        <% } else { %>
+          <p class="xp-desc is-empty"><%= t('exp.sem_descricao') %></p>
+        <% } %>
+
+        <% if (social && social.trip_info) { %>
+          <section class="xp-section sx-info" aria-labelledby="t-info">
+            <h2 id="t-info"><%= t('social.info_viagem') %></h2>
+            <p class="sx-pre"><%= social.trip_info %></p>
+          </section>
+        <% } %>
+
+        <% if (galeria && galeria.length > 1) { %>
+          <ul class="sx-gallery" aria-label="<%= t('social.galeria') %>">
+            <% galeria.forEach(function (url, i) { %>
+              <li><a href="<%= url %>" target="_blank" rel="noopener"><img src="<%= url %>" alt="<%= t('social.foto_n', { n: i + 1 }) %>" loading="lazy"></a></li>
+            <% }) %>
+          </ul>
+        <% } %>
+
+        <dl class="xp-facts">
+          <div><dt><%= t('exp.preco') %></dt><dd><%= precoFmt %><%= gratuita ? '' : ' ' + t('home.por_pessoa') %></dd></div>
+          <div><dt><%= t('exp.horarios_com_vaga') %></dt><dd><%= slots.length ? t('exp.n_horarios', { n: slots.length }) : t('exp.nenhum_no_momento') %></dd></div>
+          <div><dt><%= t('exp.pagamento') %></dt><dd><%= t('exp.pix_ou_cartao') %></dd></div>
+          <div><dt><%= t('exp.reserva') %></dt><dd><%= t('exp.vaga_segura', { min: holdMinutes }) %></dd></div>
+        </dl>
+
+        <% if (sc) { %>
+          <section class="xp-section" aria-labelledby="t-score">
+            <h2 id="t-score"><%= t('exp.perfil_titulo') %></h2>
+            <ul class="score score--lg" aria-label="<%= t('exp.perfil_aria') %>">
+              <li><b><%= sc[0] %></b><span><%= t('home.score_aventura') %></span></li>
+              <li><b><%= sc[1] %></b><span><%= t('home.score_natureza') %></span></li>
+              <li><b><%= sc[2] %></b><span><%= t('home.score_relax') %></span></li>
+            </ul>
+            <p class="note"><%= t('exp.perfil_nota') %></p>
+          </section>
+        <% } %>
+
+        <!-- Avaliações verificadas: só de quem fez a experiência. -->
+        <section class="xp-section reviews" id="avaliacoes" aria-labelledby="t-avaliacoes">
+          <h2 id="t-avaliacoes"><%= t('exp.avaliacoes_titulo') %></h2>
+          <% if (!avaliacoes.resumo.total) { %>
+            <p class="booking-sub">
+              <%= t('exp.sem_avaliacoes') %>
+            </p>
+          <% } else { const r = avaliacoes.resumo; %>
+            <div class="reviews-summary">
+              <p class="reviews-score">
+                <strong><%= r.media.toLocaleString(locals.intl || 'pt-BR', { minimumFractionDigits: 1 }) %></strong>
+                <span aria-hidden="true" class="reviews-stars"><%= '★'.repeat(Math.round(r.media)) %><span class="off"><%= '★'.repeat(5 - Math.round(r.media)) %></span></span>
+                <span class="sr-only"><%= t('exp.nota_media', { media: r.media }) %>,</span>
+                <span class="reviews-total"><%= (social && social.exemplo) ? t(r.total === 1 ? 'social.avaliacao_exemplo_uma' : 'social.avaliacao_exemplo_varias', { n: r.total }) : t(r.total === 1 ? 'home.avaliacao_uma' : 'home.avaliacao_varias', { n: r.total }) %></span>
+              </p>
+              <ul class="reviews-bars" aria-label="<%= t('exp.distribuicao_notas') %>">
+                <% [5,4,3,2,1].forEach(function (n) { const q = r['n' + n]; %>
+                  <li><span><%= n %>★</span><span class="bar"><b data-pct="<%= Math.round(q / r.total * 100) %>"></b></span><span><%= q %></span></li>
+                <% }); %>
+              </ul>
+            </div>
+            <ul class="reviews-list">
+              <% avaliacoes.avaliacoes.forEach(function (a) { %>
+                <li class="review">
+                  <p class="review-head">
+                    <span class="reviews-stars" aria-label="<%= t('exp.n_estrelas', { n: a.rating }) %>"><%= '★'.repeat(a.rating) %><span class="off"><%= '★'.repeat(5 - a.rating) %></span></span>
+                    <strong><%= a.autor %></strong><% if (a.exemplo) { %> <span class="tag-exemplo"><%= t('comunidade.exemplo') %></span><% } %>
+                    <time datetime="<%= new Date(a.created_at).toISOString() %>"><%= fmt.data(a.created_at) %></time>
+                  </p>
+                  <% if (a.title) { %><h3><%= a.title %></h3><% } %>
+                  <% if (a.body) { %><p><%= a.body %></p><% } %>
+                  <% if (a.fotos && a.fotos.length) { %>
+                    <ul class="review-photos-list" aria-label="<%= t('exp.fotos_de', { autor: a.autor }) %>">
+                      <% a.fotos.forEach(function (url, i) { %>
+                        <li><a href="<%= url %>" target="_blank" rel="noopener">
+                          <img src="<%= url %>" alt="<%= t('exp.foto_n_de', { n: i + 1, autor: a.autor }) %>" loading="lazy">
+                        </a></li>
+                      <% }); %>
+                    </ul>
+                  <% } %>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+        </section>
+
+        <section class="xp-section" aria-labelledby="t-quem">
+          <h2 id="t-quem"><%= t('exp.quem_organiza') %></h2>
+          <% if (comunidade) { const cr = social.criador; %>
+            <div class="sx-creator">
+              <a href="/usuarios/<%= encodeURIComponent(cr.id) %>" class="sx-creator-id">
+                <% if (cr.avatar) { %><img src="<%= cr.avatar %>" alt="" width="56" height="56"><% } else { %><span class="sx-avatar" aria-hidden="true"><%= cr.nome.charAt(0).toUpperCase() %></span><% } %>
+                <span><strong><%= cr.nome %></strong><small><%= t('social.membro_desde', { data: fmt.dataCurta(cr.desde) }) %> · <span data-seguidores><%= t(cr.seguidores === 1 ? 'social.seguidor_um' : 'social.seguidores_n', { n: cr.seguidores }) %></span></small></span>
+              </a>
+              <% if (!eDono) { %>
+                <button type="button" class="<%= social.meu.segue ? 'btn-ghost' : 'btn-primary' %> btn-sm" data-seguir="<%= cr.id %>" aria-pressed="<%= social.meu.segue %>" <%= logado ? '' : 'data-login' %>>
+                  <%= social.meu.segue ? t('social.seguindo') : t('social.seguir') %>
+                </button>
+              <% } %>
+            </div>
+            <p class="note"><%= service.price_cents > 0 ? t('social.nota_paga', { operador: service.operador || cr.nome }) : t('social.nota_gratuita') %></p>
+          <% } else { %>
+            <p><%= service.operador ? t('exp.operador_parceiro', { operador: service.operador }) : t('exp.operador_aquatrip') %></p>
+          <% } %>
+        </section>
+
+        <section class="xp-section sx-comments" id="comentarios" aria-labelledby="t-coment">
+          <h2 id="t-coment"><%= t('social.comentarios') %></h2>
+          <% if (logado) { %>
+            <form class="sx-comment-form" id="sxComentar" data-servico="<%= service.id %>" novalidate data-fk-busy="off">
+              <label for="sxTexto" class="sr-only"><%= t('social.comentar_rotulo') %></label>
+              <textarea id="sxTexto" name="texto" rows="2" minlength="2" maxlength="600" data-counter required
+                        placeholder="<%= eDono ? t('social.comentar_ph_dono') : t('social.comentar_ph') %>" aria-describedby="sxTextoErr"></textarea>
+              <span class="field-error" id="sxTextoErr" aria-live="polite"></span>
+              <div class="form-actions"><button type="submit" class="btn-primary btn-sm" id="sxEnviar"><span><%= t('social.publicar_comentario') %></span></button></div>
+            </form>
+          <% } else { %>
+            <p class="booking-sub"><a href="/login?redirect=<%= encodeURIComponent('/reservar/' + service.slug + '#comentarios') %>"><%= t('social.entre_comentar') %></a></p>
+          <% } %>
+          <ul class="sx-comment-list" id="sxLista">
+            <% comentarios.forEach(function (c) { %>
+              <li class="sx-comment" data-id="<%= c.id %>">
+                <a class="sx-c-avatar" href="/usuarios/<%= encodeURIComponent(c.autor.id) %>" aria-hidden="true" tabindex="-1">
+                  <% if (c.autor.avatar) { %><img src="<%= c.autor.avatar %>" alt="" width="36" height="36" loading="lazy"><% } else { %><span class="sx-avatar"><%= c.autor.nome.charAt(0).toUpperCase() %></span><% } %>
+                </a>
+                <div>
+                  <p class="sx-c-head"><a href="/usuarios/<%= encodeURIComponent(c.autor.id) %>"><strong><%= c.autor.nome %></strong></a><% if (c.autor.exemplo) { %> <span class="tag-exemplo"><%= t('comunidade.exemplo') %></span><% } %> <time datetime="<%= new Date(c.criado_em).toISOString() %>"><%= fmt.dataHora(c.criado_em) %></time></p>
+                  <p class="sx-pre"><%= c.texto %></p>
+                  <% if (c.pode_apagar) { %><button type="button" class="sx-c-del" data-apagar="<%= c.id %>"><%= t('social.apagar') %></button><% } %>
+                </div>
+              </li>
+            <% }) %>
+          </ul>
+          <p class="booking-sub" id="sxVazio"<%- comentarios.length ? ' hidden' : '' %>><%= t('social.sem_comentarios') %></p>
+        </section>
+
+        <% if (podeDenunciar && logado && !social.meu.denunciou) { %>
+          <dialog class="cx-dialog" id="sxDenuncia" aria-labelledby="sxDenTitulo">
+            <form class="cx-dialog-body" id="sxDenForm" data-servico="<%= service.id %>" novalidate data-fk-busy="off">
+              <h2 id="sxDenTitulo"><%= t('social.denunciar_titulo') %></h2>
+              <p class="field-help"><%= t('social.denunciar_texto') %></p>
+              <div class="field">
+                <label for="sxMotivo"><%= t('social.motivo') %></label>
+                <select id="sxMotivo" name="motivo" required>
+                  <% Object.keys(motivosDenuncia).forEach(function (k) { %><option value="<%= k %>"><%= t('social.motivo_' + k.toLowerCase()) %></option><% }) %>
+                </select>
+              </div>
+              <div class="field">
+                <label for="sxDetalhes"><%= t('social.detalhes') %> <span class="opt"><%= t('criar.opcional') %></span></label>
+                <textarea id="sxDetalhes" name="detalhes" rows="3" maxlength="500" data-counter></textarea>
+              </div>
+              <p class="form-status" id="sxDenStatus" role="status"></p>
+              <div class="form-actions">
+                <button type="button" class="btn-ghost" id="sxDenCancelar"><%= t('social.cancelar') %></button>
+                <button type="submit" class="btn-danger btn" id="sxDenEnviar"><span><%= t('social.enviar_denuncia') %></span></button>
+              </div>
+            </form>
+          </dialog>
+        <% } %>
+      </div>
+
+      <aside class="book" id="reservar" aria-labelledby="t-book">
+        <h2 class="sr-only" id="t-book"><%= t('exp.reservar') %></h2>
+        <p class="book-price"><strong><%= precoFmt %></strong><% if (!gratuita) { %><span><%= t('home.por_pessoa') %></span><% } %></p>
+
+        <% if (error) { %>
+          <p class="form-alert form-alert-error" role="alert"><%= error %></p>
+        <% } %>
+
+        <% if (!slots.length) { %>
+          <p class="book-empty"><%= t('exp.sem_horarios') %></p>
+          <a class="btn-ghost btn-block" href="/reservar"><%= t('exp.ver_outras') %></a>
+        <% } else { %>
+          <form action="/reservar" method="POST" id="bookForm" data-price="<%= service.price_cents %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="serviceSlug" value="<%= service.slug %>">
+            <fieldset>
+              <legend><%= t('exp.escolha_data') %></legend>
+              <ul class="slots">
+                <% slots.forEach(function (slot, i) { const livre = slot.capacity - slot.taken; %>
+                  <li class="slot">
+                    <input type="radio" id="slot-<%= slot.id %>" name="slotId" value="<%= slot.id %>" data-left="<%= livre %>" required <%= i === 0 ? 'checked' : '' %>>
+                    <label for="slot-<%= slot.id %>">
+                      <b><%= fmt.diaCurto(slot.starts_at) %>, <%= fmt.hora(slot.starts_at) %></b>
+                      <small><%= t(livre === 1 ? 'exp.vaga_uma' : 'exp.vaga_varias', { n: livre }) %></small>
+                      <span class="sr-only"><%= fmt.dataHoraExtenso(slot.starts_at) %></span>
+                    </label>
+                  </li>
+                <% }); %>
+              </ul>
+            </fieldset>
+            <div class="qty">
+              <label for="quantity"><%= t('exp.pessoas') %></label>
+              <div class="stepper">
+                <button type="button" data-q="-1" aria-label="<%= t('exp.menos_uma') %>"><i data-lucide="minus"></i></button>
+                <input type="number" id="quantity" name="quantity" value="1" min="1" max="20" required inputmode="numeric">
+                <button type="button" data-q="1" aria-label="<%= t('exp.mais_uma') %>"><i data-lucide="plus"></i></button>
+              </div>
+            </div>
+            <p class="book-total"><span><%= t('exp.total') %></span><span id="bookTotal"><%= precoFmt %></span></p>
+            <% if (logado) { %>
+              <button type="submit" class="btn-primary btn-lg btn-block"><%= gratuita ? t('social.confirmar_participacao') : t('exp.continuar_pagamento') %></button>
+            <% } else { %>
+              <%# Visitante vê tudo; para reservar, entra e volta para esta mesma página. %>
+              <a class="btn-primary btn-lg btn-block" href="/login?redirect=<%= encodeURIComponent('/reservar/' + service.slug) %>"><%= t('exp.entrar_reservar') %></a>
+              <p class="book-note"><%- t('exp.sem_conta_html') %></p>
+            <% } %>
+            <p class="book-note"><%= gratuita ? t('social.gratuita_nota') : t('exp.vaga_reservada_min', { min: holdMinutes }) %></p>
+          </form>
+        <% } %>
+      </aside>
+    </div>
+  </div>
+
+  <% if (slots.length) { %>
+    <div class="book-bar" aria-hidden="true">
+      <p><strong><%= precoFmt %></strong><% if (!gratuita) { %><small><%= t('home.por_pessoa') %></small><% } %></p>
+      <a class="btn-primary" href="#reservar" tabindex="-1"><%= t('exp.escolher_data') %></a>
+    </div>
+  <% } %>
+</main>
+
+<%- include('../partials/footer') %>
+<script src="/js/barras.js" defer></script>
+<script src="/js/experiencia.js" defer></script>
+<script src="/js/social.js" defer></script>
+</body>
+</html>
